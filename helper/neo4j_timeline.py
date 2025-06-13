@@ -97,78 +97,81 @@ def get_timeline_data_by_case_id(case_id: str, skip: int, limit: int, start_date
 
         where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
 
-        # query = f"""
-        #     MATCH (c:Case {{name: $case}})-[:HAS_FILE]->(f:Source)-[:HAS_EVENT]->(ev:Event)-[:INVOLVES]->(e:Entity)
-        #     {where_clause}
-        #     WITH ev, f, collect(DISTINCT e.name) AS entityList
-        #     WITH ev, f, apoc.coll.sort(entityList) AS sortedEntities
-        #     WITH ev.date AS date,
-        #         ev.id AS eventId,
-        #         ev.statement AS statement,
-        #         ev.category AS category,
-        #         sortedEntities AS entities,
-        #         f.name AS source,
-        #         f.ingestedAt AS ingestedAt
-        #     ORDER BY ingestedAt DESC
-        #     WITH date, statement, category, entities, collect({{
-        #         eventId: eventId,
-        #         statement: statement,
-        #         category: category,
-        #         source: source,
-        #         ingestedAt: ingestedAt
-        #     }})[0] AS latest
-        #     RETURN latest.source AS source,
-        #         latest.eventId AS eventId,
-        #         date,
-        #         latest.statement AS statement,
-        #         latest.category AS category,
-        #         entities
-        #     ORDER BY date
-        #     SKIP $skip
-        #     LIMIT $limit
-        # """
         query = f"""
             MATCH (c:Case {{name: $case}})-[:HAS_FILE]->(f:Source)-[:HAS_EVENT]->(ev:Event)-[:INVOLVES]->(e:Entity)
             {where_clause}
-            WITH ev, f, collect(DISTINCT e.name) AS entityList,
-                 collect(DISTINCT {{name: e.name, type: e.type}}) AS entityWithTypeList
-            WITH ev, f, apoc.coll.sort(entityList) AS sortedEntities,
-                 entityWithTypeList AS entitiesWithType
+            WITH ev, f, collect(DISTINCT e.name) AS entityList
+            WITH ev, f, apoc.coll.sort(entityList) AS sortedEntities
             WITH ev.date AS date,
-                 ev.id AS eventId,
-                 ev.statement AS statement,
-                 ev.category AS category,
-                 sortedEntities AS entities,
-                 entitiesWithType,
-                 f.name AS source,
-                 f.ingestedAt AS ingestedAt
+                ev.id AS eventId,
+                ev.statement AS statement,
+                ev.category AS category,
+                coalesce(ev.tag, '') AS tag,
+                sortedEntities AS entities,
+                f.name AS source,
+                f.ingestedAt AS ingestedAt
             ORDER BY ingestedAt DESC
-            WITH date, statement, category, entities, entitiesWithType, collect({{
-                 eventId: eventId,
-                 statement: statement,
-                 category: category,
-                 source: source,
-                 ingestedAt: ingestedAt
+            WITH date, statement, category, tag, entities, collect({{
+                eventId: eventId,
+                statement: statement,
+                category: category,
+                tag: tag,
+                source: source,
+                ingestedAt: ingestedAt
             }})[0] AS latest
             RETURN latest.source AS source,
-                   latest.eventId AS eventId,
-                   date,
-                   latest.statement AS statement,
-                   latest.category AS category,
-                   entities,
-                   entitiesWithType
-            ORDER BY date DESC
+                latest.eventId AS eventId,
+                date,
+                latest.statement AS statement,
+                latest.category AS category,
+                latest.tag AS tag,
+                entities
+            ORDER BY date
             SKIP $skip
             LIMIT $limit
         """
+        # query = f"""
+        #     MATCH (c:Case {{name: $case}})-[:HAS_FILE]->(f:Source)-[:HAS_EVENT]->(ev:Event)-[:INVOLVES]->(e:Entity)
+        #     {where_clause}
+        #     WITH ev, f, collect(DISTINCT e.name) AS entityList,
+        #          collect(DISTINCT {{name: e.name, type: e.type}}) AS entityWithTypeList
+        #     WITH ev, f, apoc.coll.sort(entityList) AS sortedEntities,
+        #          entityWithTypeList AS entitiesWithType
+        #     WITH ev.date AS date,
+        #          ev.id AS eventId,
+        #          ev.statement AS statement,
+        #          ev.category AS category,
+        #          sortedEntities AS entities,
+        #          entitiesWithType,
+        #          f.name AS source,
+        #          f.ingestedAt AS ingestedAt
+        #     ORDER BY ingestedAt DESC
+        #     WITH date, statement, category, entities, entitiesWithType, collect({{
+        #          eventId: eventId,
+        #          statement: statement,
+        #          category: category,
+        #          source: source,
+        #          ingestedAt: ingestedAt
+        #     }})[0] AS latest
+        #     RETURN latest.source AS source,
+        #            latest.eventId AS eventId,
+        #            date,
+        #            latest.statement AS statement,
+        #            latest.category AS category,
+        #            entities,
+        #            entitiesWithType
+        #     ORDER BY date DESC
+        #     SKIP $skip
+        #     LIMIT $limit
+        # """
 
         count_query = f"""
             MATCH (c:Case {{name: $case}})-[:HAS_FILE]->(:Source)-[:HAS_EVENT]->(ev:Event)-[:INVOLVES]->(e:Entity)
             {where_clause}
             WITH ev, collect(DISTINCT e.name) AS entityList
-            WITH ev.date AS date, ev.statement AS statement, ev.category AS category, apoc.coll.sort(entityList) AS sortedEntities
+            WITH ev.date AS date, ev.statement AS statement, ev.category AS category, coalesce(ev.tag, '') AS tag, apoc.coll.sort(entityList) AS sortedEntities
             WITH date, statement, category, sortedEntities,
-                date + '|' + statement + '|' + category + '|' + apoc.text.join(sortedEntities, ',') AS uniqueKey
+                date + '|' + statement + '|' + category + '|' + tag + '|' + apoc.text.join(sortedEntities, ',') AS uniqueKey
             RETURN count(DISTINCT uniqueKey) AS total
 
         """
@@ -264,8 +267,6 @@ def delete_entity_from_case(case_id: str, entity_name: str):
     return res
 
     
-    
-
 _QUERY_ENTITY_IN_CASE = """
 MATCH (c:Case {name:$case})-[:HAS_FILE]->(:File)-[:HAS_EVENT]->(ev)
 MATCH (ev)-[:INVOLVES]->(:Entity {case:$case, name:$entity})
@@ -279,31 +280,6 @@ RETURN ev.date AS date, ev.statement AS statement,
 def get_entity_in_case(case_name: str, entity_name: str):
     with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as drv, drv.session() as s:
         return s.run(_QUERY_ENTITY_IN_CASE, case=case_name, entity=entity_name).data()
-
-
-# QUERY_CASE = """
-# MATCH (c:Case {name:$case})-[:HAS_FILE]->(f:Source)-[:HAS_EVENT]->(ev)
-# OPTIONAL MATCH (ev)-[:INVOLVES]->(e:Entity {case:$case})
-# RETURN f.name AS file, ev.date AS date, ev.statement AS statement, collect(e.name) AS entities
-# ORDER BY date"""
-
-# QUERY_CASE = """
-#     MATCH (c:Case {name:$case})-[:HAS_FILE]->(f:Source)-[:HAS_EVENT]->(ev)
-#     OPTIONAL MATCH (ev)-[:INVOLVES]->(e:Entity {case:$case})
-
-#     WITH ev,                         /* unique event                         */
-#         collect(DISTINCT f.name) AS files,
-#         collect(DISTINCT e.name) AS entities
-
-#     RETURN files,                    /* now a list of all source files      */
-#         ev.date     AS date,
-#         ev.statement AS statement,
-#         entities
-#     ORDER BY date
-#     """
-# def get_case(case_name: str):
-#     with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as drv, drv.session() as s:
-#         return s.run(QUERY_CASE, case=case_name).data()
 
 
 async def get_entity_graph_echarts(case_name: str):
@@ -402,14 +378,15 @@ async def delete_entity(case_name, entity_name):
 
     
 # fetch graph data for echarts
-async def fetch_graph_data_new(case_name: str) -> Dict[str, Any]:
+async def fetch_graph_data_new(case_name: str, source_id: str) -> Dict[str, Any]:
     try:
         with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as drv, drv.session() as s:
             # 1️⃣ Fetch nodes (entities + their types)
             nodes_result = s.run("""
-                MATCH (c:Case {name: $case})-[:HAS_FILE]->(:Source)-[:HAS_EVENT]->(ev:Event)-[:INVOLVES]->(e:Entity)
+                MATCH (c:Case {name: $case})-[:HAS_FILE]->(f:Source)-[:HAS_EVENT]->(ev:Event)-[:INVOLVES]->(e:Entity)
+                WHERE elementId(f) = $source_id
                 RETURN DISTINCT e.name AS name, e.type AS type
-            """, case=case_name)
+            """, case=case_name, source_id=source_id)
 
             nodes = []
             name_to_id = {}
@@ -437,13 +414,14 @@ async def fetch_graph_data_new(case_name: str) -> Dict[str, Any]:
                     # Optional size, position (can be randomized or calculated on the frontend)
                     "symbolSize": 10
                 })
-
+                
             # 2️⃣ Fetch edges (relations)
             links_result = s.run("""
-                MATCH (c:Case {name: $case})-[:HAS_FILE]->(:Source)-[:HAS_EVENT]->(ev:Event)
-                MATCH (e1:Entity)-[r:REL {eventId: ev.id}]->(e2)
+                MATCH (c:Case {name: $case})-[:HAS_FILE]->(f:Source)-[:HAS_EVENT]->(ev:Event)
+                WHERE elementId(f) = $source_id
+                MATCH (e1:Entity)-[r:REL {eventId: ev.id}]->(e2:Entity)
                 RETURN DISTINCT e1.name AS source, e2.name AS target, r.relType AS relType
-            """, case=case_name)
+            """, case=case_name, source_id=source_id)
 
             links = []
             for record in links_result:
@@ -544,16 +522,19 @@ async def fetch_graph_data_new1(case_name: str) -> Dict[str, Any]:
 
 
 # fetch graph data for neo4j graph (with real deduplication)
-async def fetch_graph_for_neo4j_graph_unique_relation(case_name: str) -> Dict[str, Any]:
+async def fetch_graph_for_neo4j_graph_unique_relation(case_name: str, source_id: str) -> Dict[str, Any]:
     try:
         with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as drv, drv.session() as s:
             query = """
-                MATCH (n:Entity {case: $case})-[r:REL]-(m)
+                MATCH (c:Case {name: $case})-[:HAS_FILE]->(f:Source)-[:HAS_EVENT]->(ev:Event)
+                WHERE elementId(f) = $source_id
+
+                MATCH (n:Entity)-[r:REL {eventId: ev.id}]-(m)
                 WHERE (m:Year OR (m:Entity AND m.case = $case))
                 WITH n, m, r.relType AS relType
                 RETURN DISTINCT n, m, relType
             """
-            result = s.run(query, case=case_name)
+            result = s.run(query, case=case_name, source_id=source_id)
 
             nodes = []
             edges = []
@@ -701,7 +682,7 @@ async def update_event_statement(event_id: str, new_statement: str):
 #         return False
 
 
-async def update_event_fields_in_neo4j(event_id: str, statement: Optional[str], category: Optional[str], date: Optional[str]) -> bool:
+async def update_event_fields_in_neo4j(event_id: str, statement: Optional[str], category: Optional[str], date: Optional[str],  tag: Optional[str] ) -> bool:
     """
     Update only the statement, category, and date fields of an event in Neo4j.
     """
@@ -710,7 +691,8 @@ async def update_event_fields_in_neo4j(event_id: str, statement: Optional[str], 
         MATCH (ev:Event {id: $event_id})
         SET ev.statement = coalesce($statement, ev.statement),
             ev.category = coalesce($category, ev.category),
-            ev.date = coalesce(date($date), ev.date)
+            ev.date = coalesce(date($date), ev.date),
+            ev.tag       = coalesce($tag, ev.tag)
     """
 
     try:
@@ -720,10 +702,25 @@ async def update_event_fields_in_neo4j(event_id: str, statement: Optional[str], 
                 event_id=event_id,
                 statement=statement,
                 category=category,
-                date=date
+                date=date,
+                tag=tag
             )
 
         return True
     except Exception as e:
         print("Error updating event fields in Neo4j:", e)
         return False
+
+
+async def get_sources_by_case(case_name: str) -> List[Dict[str, Any]]:
+    try:
+        with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as drv, drv.session() as s:
+            result = s.run("""
+                MATCH (c:Case {name: $case})-[:HAS_FILE]->(f:Source)
+                RETURN elementId(f) AS sourceId, f.name AS sourceName
+            """, case=case_name)
+            
+            return [dict(record) for record in result]
+    except Exception as e:
+        print(f"Error fetching source IDs: {e}")
+        return []

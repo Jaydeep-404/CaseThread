@@ -11,10 +11,11 @@ BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 class TimelineEntry(BaseModel):
     source: str
     eventId: str
-    date: Optional[str]
-    statement: Optional[str]
-    category: Optional[str]
-    entities: List[str]
+    date: Optional[str]= ""
+    statement: Optional[str] = ""
+    category: Optional[str] = ""
+    entities: List[str] = ""
+    tag: Optional[str]= ""
     # entityWithTypeList: Optional[List[str]]
     
     def serialize(self):
@@ -30,7 +31,8 @@ class TimelineEntry(BaseModel):
             "date": self.date,
             "statement": self.statement,
             "entities": self.entities,
-            "category": self.category
+            "category": self.category,
+            "tag": self.tag
             # "entityWithTypeList": self.entityWithTypeList
         }
 
@@ -66,4 +68,5 @@ class EventUpdateRequest(BaseModel):
     statement: Optional[str] = None
     category: Optional[str] = None
     date: Optional[str] = None
+    tag: Optional[str] = None
     # entities: List[EntityUpdate]
