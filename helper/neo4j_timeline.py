@@ -571,7 +571,7 @@ async def fetch_graph_for_neo4j_graph_unique_relation(case_name: str, source_id:
                     edges.append({
                         "from": source_id,
                         "to": target_id,
-                        "label": rel_type,
+                        "label": rel_type.replace("_", " ") ,
                         "id": str(uuid4())
                     })
                     edge_keys.add(edge_key)
