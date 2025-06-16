@@ -10,3 +10,4 @@ env/
 case_docs/
 uploads/
 templates/
+corpus.csv

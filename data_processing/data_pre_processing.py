@@ -93,13 +93,13 @@ async def process_data(db, limit=100):
         pending_docs = db.documents.find({
             "status": "pending",
             "is_md_file": True
-        }).limit(limit)
+        }).sort("created_at", 1).limit(limit)
         
-        first_doc = await pending_docs.to_list(length=1)
-        if not first_doc:
+        pending_docs_data = await pending_docs.to_list(length=limit)
+        if not pending_docs_data:
             return False
         
-        async for doc in pending_docs:
+        for doc in pending_docs_data:
             try:
                 file_path = doc["md_file_path"]
                 source_url = doc.get("document_url") if doc["document_type"] == 'link' else clean_source(doc['file_path'])
@@ -149,12 +149,13 @@ async def process_data(db, limit=100):
 # Create markdown file from document
 async def create_markdown_file(db, limit: int=100):
     try:
-        document = db.documents.find({"is_md_file": {"$ne": True}, "status": "pending", "document_type": "file"}).limit(limit)
-        first_doc = await document.to_list(length=1)
-        if not first_doc:
+        document = db.documents.find({"is_md_file": {"$ne": True}, "status": "pending", "document_type": "file"}).sort("created_at", 1).limit(limit)
+        pending_docs_data = await document.to_list(length=limit)
+       
+        if not pending_docs_data:
             print("No documents to process....")
             return "No documents to process"
-        async for doc in document:
+        for doc in pending_docs_data:
             doc_id = doc["_id"]
             file_path = doc["file_path"]
             await parse_file(doc_id, file_path, db)
@@ -179,7 +180,7 @@ async def data_ingestion_pipeline(limit: int=50):
         await process_data(db, limit)
         print("Data ingestion task done")
     except Exception as e:
-        print("[FATAL ERROR] Data ingestion failed:", e)
+        print("Data ingestion failed:", e)
         return False
         
         
