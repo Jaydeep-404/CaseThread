@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
@@ -10,6 +11,7 @@ from database import connect_to_mongodb, close_mongodb_connection
 from routes import auth, cases, timeline
 from pathlib import Path
 from pydantic import ValidationError
+from data_processing.data_pre_processing import data_ingestion_pipeline
 
 
 # Configure logging
@@ -26,6 +28,16 @@ async def lifespan(app: FastAPI):
     # Startup actions
     print("App is starting up...")
     await connect_to_mongodb()
+    async def cron_runner():
+        while True:
+            print("⏱ Running scrape_content...")
+            try:
+                await data_ingestion_pipeline(limit=2)
+            except Exception as e:
+                print("Error in scrape_content cron:", e)
+            await asyncio.sleep(300)  # Sleep 5 minutes
+
+    asyncio.create_task(cron_runner())  # Schedule background task
     yield
     # Shutdown actions
     print("App is shutting down...")

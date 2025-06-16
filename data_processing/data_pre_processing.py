@@ -164,19 +164,19 @@ async def create_markdown_file(db, limit: int=100):
     
 
 # Data ingestion pipeline
-async def data_ingestion_pipeline():
+async def data_ingestion_pipeline(limit: int=50):
     try:
         # Connect to MongoDB
         db = await get_database()
         
         # Scrape data from source
-        await scrape_content(db, 2)
+        await scrape_content(db, limit)
         print("Scraping task done")
         # create md files
-        await create_markdown_file(db, 2)
+        await create_markdown_file(db, limit)
         print("Markdown files create task done")
         # from markdown files to entities extraction and push to neo4j
-        await process_data(db, 2)
+        await process_data(db, limit)
         print("Data ingestion task done")
     except Exception as e:
         print("[FATAL ERROR] Data ingestion failed:", e)
