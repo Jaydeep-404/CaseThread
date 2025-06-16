@@ -94,7 +94,11 @@ async def process_data(db, limit=100):
             "status": "pending",
             "is_md_file": True
         }).limit(limit)
-
+        
+        first_doc = await pending_docs.to_list(length=1)
+        if not first_doc:
+            return False
+        
         async for doc in pending_docs:
             try:
                 file_path = doc["md_file_path"]
@@ -146,8 +150,10 @@ async def process_data(db, limit=100):
 async def create_markdown_file(db, limit: int=100):
     try:
         document = db.documents.find({"is_md_file": {"$ne": True}, "status": "pending", "document_type": "file"}).limit(limit)
-        if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+        first_doc = await document.to_list(length=1)
+        if not first_doc:
+            print("No documents to process....")
+            return "No documents to process"
         async for doc in document:
             doc_id = doc["_id"]
             file_path = doc["file_path"]
@@ -164,14 +170,14 @@ async def data_ingestion_pipeline():
         db = await get_database()
         
         # Scrape data from source
-        await scrape_content(db, 100)
-        print("Scraping completed successfully")
+        await scrape_content(db, 2)
+        print("Scraping task done")
         # create md files
-        await create_markdown_file(db, 100)
-        print("Markdown files created successfully")
+        await create_markdown_file(db, 2)
+        print("Markdown files create task done")
         # from markdown files to entities extraction and push to neo4j
-        await process_data(db, 100)
-        print("Data ingestion completed successfully")
+        await process_data(db, 2)
+        print("Data ingestion task done")
     except Exception as e:
         print("[FATAL ERROR] Data ingestion failed:", e)
         return False

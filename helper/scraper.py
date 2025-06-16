@@ -162,9 +162,17 @@ async def scrape_content(db, limit: int = 100):
             ).limit(limit)
         
         doc_to_update = []
+        
+        first_doc = await cursor.to_list(length=1)
+        if not first_doc:
+            print("No documents to scrape.")
+            return {"status": False, "message": "No pending documents to scrape."}
+        
         async for doc in cursor:
             try:
                 doc_id = doc.get('_id')
+                if doc.get("document_url", None) is None:
+                    continue
                 scraped_data = await scrape_any(doc.get("document_url"))
                 content = scraped_data.get('content')
                 file_path = f"./case_docs/doc_{doc_id}.md"

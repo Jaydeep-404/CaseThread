@@ -204,8 +204,7 @@ async def upload_documents(
         uploaded_documents.append(DocumentResponse(**document))
 
         # Schedule background task to parse the document
-        # background_tasks.add_task(parse_file, document_id, file_path, db)
-        background_tasks.add_task(data_ingestion_pipeline)
+        # background_tasks.add_task(data_ingestion_pipeline)
     return uploaded_documents
 
 
@@ -262,7 +261,7 @@ async def link_document(
     del created_document["_id"]
     
     # Scrape content from the URL
-    background_tasks.add_task(data_ingestion_pipeline)
+    # background_tasks.add_task(data_ingestion_pipeline)
     return DocumentResponse(**created_document)
 
 
