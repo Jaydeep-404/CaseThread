@@ -438,13 +438,14 @@ class AsyncNeo4jEmbedIngestor:
             })
         return prepped
 
-    async def push(self, case_name: str, file_name: str, rows: List[Dict[str, Any]]) -> ResultSummary:
+    async def push(self, case_name: str, file_name: str, doc_title: str, rows: List[Dict[str, Any]]) -> ResultSummary:
         prepared = await self._prepare_rows(case_name, rows)
 
         _CORE_CYPHER = """
         MERGE (c:Case {name:$case})
         MERGE (f:Source {case:$case, name:$source})
-          ON CREATE SET f.ingestedAt=datetime($ingestedAt)
+          ON CREATE SET f.ingestedAt=datetime($ingestedAt),
+            f.docTitle = $doc_title
         MERGE (c)-[:HAS_FILE]->(f)
         WITH f, $case AS case_name, $rows AS rows
         UNWIND rows AS row
@@ -484,6 +485,7 @@ class AsyncNeo4jEmbedIngestor:
                 _CORE_CYPHER,
                 case=case_name,
                 source=file_name,
+                doc_title=doc_title,
                 ingestedAt=datetime.now(timezone.utc).isoformat(),
                 rows=prepared
             )

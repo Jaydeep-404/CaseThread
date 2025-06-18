@@ -105,7 +105,7 @@ async def process_data(db, limit=100):
                 file_path = doc["md_file_path"]
                 source_url = doc.get("document_url") if doc["document_type"] == 'link' else clean_source(doc['file_path'])
                 case_id = doc.get("case_id")
-
+                doc_title = doc.get("name", "Doc name")
                 with open(file_path, 'r', encoding='utf-8') as f:
                     md_content = f.read()
 
@@ -118,7 +118,7 @@ async def process_data(db, limit=100):
                     continue
                 
                 # Push to Neo4j with embbedding
-                await neo4j_data_ingestor.push(case_id, source_url, json_data)
+                await neo4j_data_ingestor.push(case_id, source_url, doc_title, json_data)
                 
                 # wihout embbeding
                 # push_to_neo4j(case_id, source_url, json_data)

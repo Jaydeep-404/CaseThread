@@ -718,7 +718,7 @@ async def get_sources_by_case(case_name: str) -> List[Dict[str, Any]]:
         with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as drv, drv.session() as s:
             result = s.run("""
                 MATCH (c:Case {name: $case})-[:HAS_FILE]->(f:Source)
-                RETURN elementId(f) AS sourceId, f.name AS sourceName
+                RETURN elementId(f) AS sourceId, f.docTitle AS sourceName
             """, case=case_name)
             
             return [dict(record) for record in result]
