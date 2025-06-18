@@ -2,7 +2,7 @@ from llama_parse import LlamaParse
 import os
 from dotenv import load_dotenv
 from bson import ObjectId
-
+from datetime import datetime, timezone 
 load_dotenv()
 
 parser = LlamaParse(
@@ -17,7 +17,7 @@ parser = LlamaParse(
 async def error_logger(db, doc_id, err):
     db.documents.update_one(
         {"_id": doc_id},
-        {"$set": {"status": "error", "actual_error": str(err)}}
+        {"$set": {"status": "error", "actual_error": str(err), "updated_at": datetime.now(timezone.utc)}}
     )
     
 
@@ -46,7 +46,7 @@ async def parse_file(doc_id, file_path, db):
 async def update_md_file_status(doc_id, output_file_path, db):
     try:
         db.documents.update_one({"_id": ObjectId(doc_id)},
-                          {"$set": {"is_md_file": True, "md_file_path": output_file_path}})
+                          {"$set": {"is_md_file": True, "md_file_path": output_file_path, "updated_at": datetime.now(timezone.utc)}})
         return True
     except Exception as e:
         print(e)

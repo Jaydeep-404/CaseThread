@@ -529,10 +529,9 @@ async def fetch_graph_for_neo4j_graph_unique_relation(case_name: str, source_id:
                 MATCH (c:Case {name: $case})-[:HAS_FILE]->(f:Source)-[:HAS_EVENT]->(ev:Event)
                 WHERE elementId(f) = $source_id
 
-                MATCH (n:Entity)-[r:REL {eventId: ev.id}]-(m)
+                MATCH (n:Entity)-[r:REL {eventId: ev.id}]->(m)
                 WHERE (m:Year OR (m:Entity AND m.case = $case))
                 WITH n, m, r.relType AS relType
-                WHERE elementId(n) < elementId(m)
                 RETURN DISTINCT n, m, relType
                 ORDER BY elementId(n)
             """

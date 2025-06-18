@@ -6,8 +6,7 @@ from newspaper import Article
 from readability import Document
 from bs4 import BeautifulSoup
 from pymongo import UpdateOne
-from bson import ObjectId
-
+from datetime import datetime, timezone
 from data_processing.data_parsing import error_logger
 
 
@@ -180,7 +179,7 @@ async def scrape_content(db, limit: int = 100):
                     f.write(content)
                     
                 doc_to_update.append(UpdateOne({"_id": doc_id},
-                            {"$set": {"is_md_file": True, "md_file_path": file_path, "is_data_scraped": True}}))
+                            {"$set": {"is_md_file": True, "md_file_path": file_path, "is_data_scraped": True, "updated_at": datetime.now(timezone.utc)}}))
             except Exception as e:
                 print("scrape_content loop err")
                 await error_logger(db, doc["_id"], e)

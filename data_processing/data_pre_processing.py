@@ -10,6 +10,7 @@ from data_processing.data_parsing import error_logger
 from helper.scraper import scrape_content
 from llama_index.llms.openai import OpenAI
 from typing import Dict, Any, List
+from datetime import datetime, timezone
 load_dotenv
 
 
@@ -132,7 +133,7 @@ async def process_data(db, limit=100):
                 # Update document status
                 await db.documents.update_one(
                     {"_id": doc["_id"]},
-                    {"$set": {"status": "processed"}}
+                    {"$set": {"status": "processed", "updated_at": datetime.now(timezone.utc)}}
                 )
 
             except Exception as err:
