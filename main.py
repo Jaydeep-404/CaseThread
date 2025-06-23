@@ -5,7 +5,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from helper.exception_handler import custom_http_exception_handler, global_exception_handler, validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from helper.exception_handler import custom_http_exception_handler, global_exception_handler, value_error_exception_handler
 from config import settings
 from database import connect_to_mongodb, close_mongodb_connection
 from routes import auth, cases, timeline
@@ -28,16 +29,16 @@ async def lifespan(app: FastAPI):
     # Startup actions
     print("App is starting up...")
     await connect_to_mongodb()
-    async def cron_runner():
-        while True:
-            print("⏱ Running scrape_content...")
-            try:
-                await data_ingestion_pipeline(limit=2)
-            except Exception as e:
-                print("Error in scrape_content cron:", e)
-            await asyncio.sleep(300)  # Sleep 5 minutes
+  
+    # async def cron_runner():
+    #     while True:
+    #         try:
+    #             await data_ingestion_pipeline(limit=2)
+    #         except Exception as e:
+    #             print("Error in scrape_content cron:", e)
+    #         await asyncio.sleep(300)  # Sleep 5 minutes
 
-    asyncio.create_task(cron_runner())  # Schedule background task
+    # # asyncio.create_task(cron_runner())  # Schedule background task
     yield
     # Shutdown actions
     print("App is shutting down...")
@@ -74,8 +75,8 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # Exception handlers
 app.add_exception_handler(HTTPException, custom_http_exception_handler)
 app.add_exception_handler(Exception, global_exception_handler)
-app.add_exception_handler(ValidationError, validation_exception_handler)
-
+app.add_exception_handler(ValidationError, value_error_exception_handler)
+app.add_exception_handler(RequestValidationError, value_error_exception_handler)
 
 # Include routers
 app.include_router(auth.router,

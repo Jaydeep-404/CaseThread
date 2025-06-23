@@ -15,6 +15,7 @@ class CaseStatus(str, Enum):
 class DocumentStatus(str, Enum):
     """Document status enum"""
     PENDING = "pending"
+    PROCESSING = "processing"
     PROCESSED = "processed"
     REJECTED = "rejected"
     ERROR = "error"
@@ -28,36 +29,6 @@ class DocumentBase(BaseModel):
 class DocumentCreate(DocumentBase):
     """Document creation model"""
     pass
-
-class DocumentInDB(DocumentBase):
-    """Document in database model"""
-    id: Optional[str] = Field(None, alias="_id")
-    case_id: str = Field(description="ID of the associated case")
-    file_url: Optional[str] = Field(None, description="URL to the file if uploaded")
-    # file_name: Optional[str] = Field(None, description="Original filename")
-    content_type: Optional[str] = Field(None, description="MIME type of the file")
-    status: DocumentStatus = Field(default=DocumentStatus.PENDING)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    model_config = ConfigDict(
-        populate_by_name=True,
-        json_schema_extra={
-            "example": {
-                "_id": "60d21b4967d0d8992e610c85",
-                "name": "Identification Document",
-                "document_url": "https://example.com/documents/id_card",
-                "document_type": "id_card",
-                "case_id": "60d21b4967d0d8992e610c86",
-                "file_url": "https://example.com/files/id_card.pdf",
-                "file_name": "id_card.pdf",
-                "content_type": "application/pdf",
-                "status": "pending",
-                "created_at": "2021-06-22T12:00:00",
-                "updated_at": "2021-06-22T12:00:00"
-            }
-        }
-    )
 
 class DocumentResponse(DocumentBase):
     """Document response model"""
@@ -99,29 +70,6 @@ class CaseBase(BaseModel):
 class CaseCreate(CaseBase):
     """Case creation model"""
     case_id: str = Field(None, description="Unique case identifier")
-
-class CaseInDB(CaseBase):
-    """Case in database model"""
-    id: Optional[str] = Field(None, alias="_id")
-    case_id: str = Field(description="Unique case identifier")
-    status: CaseStatus = Field(default=CaseStatus.ONGOING)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    model_config = ConfigDict(
-        populate_by_name=True,
-        json_schema_extra={
-            "example": {
-                "_id": "60d21b4967d0d8992e610c86",
-                "name": "Insurance Claim",
-                "description": "Auto insurance claim for accident on May 10",
-                "case_id": "CASE-2023-001",
-                "status": "open",
-                "created_at": "2021-06-22T12:00:00",
-                "updated_at": "2021-06-22T12:00:00"
-            }
-        }
-    )
 
 class CaseResponse(CaseBase):
     """Case response model"""

@@ -148,7 +148,7 @@ async def process_data(db, limit=100):
         
 
 # Create markdown file from document
-async def create_markdown_file(db, limit: int=100):
+async def create_markdown_file(db, limit: int=10):
     try:
         document = db.documents.find({"is_md_file": {"$ne": True}, "status": "pending", "document_type": "file"}).sort("created_at", 1).limit(limit)
         pending_docs_data = await document.to_list(length=limit)
@@ -166,7 +166,7 @@ async def create_markdown_file(db, limit: int=100):
     
 
 # Data ingestion pipeline
-async def data_ingestion_pipeline(limit: int=50):
+async def data_ingestion_pipeline(limit: int=10):
     try:
         # Connect to MongoDB
         db = await get_database()
@@ -183,7 +183,6 @@ async def data_ingestion_pipeline(limit: int=50):
     except Exception as e:
         print("Data ingestion failed:", e)
         return False
-        
         
     
 # async def create_xlsx_file(data, source_link):

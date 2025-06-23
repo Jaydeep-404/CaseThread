@@ -1,6 +1,7 @@
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from fastapi.exceptions import RequestValidationError
 
 
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
@@ -18,14 +19,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-async def validation_exception_handler(request: Request, exc: ValidationError):
+async def value_error_exception_handler(request: Request, exc: RequestValidationError):
     # Extract the first error message (customize as needed)
-    # error_details = exc.errors()
-    # if error_details:
-    #     msg = error_details[0].get("msg", "Invalid input.")
-    # else:
+    error_details = exc.errors()
     msg = "Invalid input."
+    if error_details:
+        msg = error_details[0].get("msg", "Invalid input.")
     return JSONResponse(
-        status_code=422,
+        status_code=400,
         content={"message": msg}
     )

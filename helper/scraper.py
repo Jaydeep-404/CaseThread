@@ -153,7 +153,7 @@ async def scrape_any(url: str, csv_path: str | None = "corpus.csv",
 
 
 # Main scraper
-async def scrape_content(db, limit: int = 100):
+async def scrape_content(db, limit: int = 10):
     try:
         cursor = db.documents.find(
             {"is_data_scraped":{"$ne": True}, "document_type": "link", "status": 'pending'},

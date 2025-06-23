@@ -1,3 +1,4 @@
+import asyncio
 from bson import ObjectId
 import os
 import uuid
@@ -46,6 +47,7 @@ MAX_FILES_ALLOWED = 4  # Maximum files allowed
 #     return f"CASE-{timestamp}-{random_part}"
 
 
+        
 @router.post("/", response_model=CaseResponse, status_code=status.HTTP_201_CREATED)
 async def create_case(case_data: CaseCreate,
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -134,7 +136,7 @@ async def upload_documents(
         )
     
     # check the length of the files
-    if len(files) > 2:
+    if len(files) > 4:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail= f"You can only upload up to {MAX_FILES_ALLOWED} files at a time"
@@ -160,7 +162,12 @@ async def upload_documents(
                     detail= f"File size exceeds the maximum allowed size {MAX_FILE_SIZE_MB} MB"
                 )
             contents += chunk
-        
+            
+        if file_size == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Empty file is not allowed"
+            )
         # Create unique filename
         file_extension = os.path.splitext(file.filename)[1] if file.filename else ""
         unique_filename = f"doc_{case_id}_{file.filename}"
@@ -205,6 +212,8 @@ async def upload_documents(
 
         # Schedule background task to parse the document
         # background_tasks.add_task(data_ingestion_pipeline)
+   
+        asyncio.create_task(data_ingestion_pipeline())
     return uploaded_documents
 
 
@@ -262,6 +271,9 @@ async def link_document(
     
     # Scrape content from the URL
     # background_tasks.add_task(data_ingestion_pipeline)
+    
+    # Trigger background task if not already running
+    asyncio.create_task(data_ingestion_pipeline())
     return DocumentResponse(**created_document)
 
 
@@ -333,7 +345,7 @@ async def get_cases(
     if sort == "alpha":
         sort_stage = {"name": 1}
     elif sort == "newest":
-        sort_stage = {"created_at": -1}
+        sort_stage = {"updated_at": -1}
     elif sort == "oldest":
         sort_stage = {"created_at": 1}
     else:
