@@ -311,7 +311,7 @@ async def request_otp(email_request: EmailRequest, background_tasks: BackgroundT
     )
     
     response = {"message": "OTP sent to your email"}
-    subject = "Verify your email"
+    subject = "[Case Thread] Verify your email"
     recipient = user.get("email")
     
     body = f"Your OTP for email verification is: {otp}"
@@ -383,16 +383,31 @@ async def set_password_after_verification(
     
     return {"message": "Password set successfully. You can now log in."}
 
+reset_attempts = {}  # { email: [datetime1, datetime2, ...] }
+RATE_LIMIT = 3
+WINDOW_MINUTES = 15
 
 # forgot password
 @router.post("/forgot-password")
 async def forgot_password(data: EmailRequest, background_tasks: BackgroundTasks, db = Depends(get_database)):
     user = await get_user_by_email(db, data.email)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="No account is associated with this email.")
 
+    now = datetime.now(timezone.utc)
+    attempts = reset_attempts.get(data.email, [])
+
+    # Remove old attempts
+    attempts = [t for t in attempts if now - t < timedelta(minutes=WINDOW_MINUTES)]
+
+    if len(attempts) >= RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="Too many reset requests. Try again later.")
+
+    # Store current attempt
+    attempts.append(now)
+    reset_attempts[data.email] = attempts
     token = str(uuid.uuid4())
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    expires_at = now + timedelta(minutes=15)
 
     await db.reset_tokens.insert_one({
         "email": (data.email).lower(),
@@ -401,8 +416,8 @@ async def forgot_password(data: EmailRequest, background_tasks: BackgroundTasks,
         "used": False
     })
     FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL")
-    reset_link = f"{FRONTEND_BASE_URL}/reset-password?token={token}"
-    subject = "Password Reset Request"
+    reset_link = f"{FRONTEND_BASE_URL}/auth/reset-password?token={token}"
+    subject = "Reset your Case Thread account password"
     recipient = data.email
     
     body = f"Click the link to reset your password:\n\n{reset_link}\n\nThis link expires in 15 minutes."
@@ -426,7 +441,7 @@ async def reset_password(data: ResetPasswordRequest, db = Depends(get_database))
 
     user = await get_user_by_email(db, token_doc['email'])
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="No account is associated with this email.")
 
     # Update password and mark token as used
     hashed_password = get_password_hash(data.new_password)
