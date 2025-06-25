@@ -383,7 +383,7 @@ async def get_cases(
 
     # Execute aggregation
     cases = []
-    async for doc in db.cases.aggregate(pipeline):
+    async for doc in db.cases.aggregate(pipeline, collation={"locale": "en", "strength": 2}):
         cases.append(CaseResponse(**doc))
 
     # Return paginated response
