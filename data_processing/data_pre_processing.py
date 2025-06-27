@@ -89,7 +89,7 @@ def clean_source(source: str) -> str:
     return re.sub(r"^uploads[\\/]", "", source)
 
 
-async def process_data(db, limit=100):
+async def process_data(db, limit=10):
     try:
         pending_docs = db.documents.find({
             "status": "pending",
@@ -100,6 +100,18 @@ async def process_data(db, limit=100):
         if not pending_docs_data:
             return False
         
+        pending_ids = [doc["_id"] async for doc in pending_docs]
+        # Step 2: Update them to "processing"
+        if pending_ids:
+            await db.documents.update_many(
+                {"_id": {"$in": pending_ids}},
+                {
+                    "$set": {
+                        "status": "processing",
+                        "updated_at": datetime.now(timezone.utc)
+                    }
+                }
+            )
         for doc in pending_docs_data:
             try:
                 file_path = doc["md_file_path"]
@@ -166,17 +178,20 @@ async def create_markdown_file(db, limit: int=10):
     
 
 # Data ingestion pipeline
-async def data_ingestion_pipeline(limit: int=10):
+async def data_ingestion_pipeline(doc_type, limit: int=10):
     try:
         # Connect to MongoDB
         db = await get_database()
         
-        # Scrape data from source
-        await scrape_content(db, limit)
-        print("Scraping task done")
-        # create md files
-        await create_markdown_file(db, limit)
-        print("Markdown files create task done")
+        if doc_type == 'link':
+            # Scrape data from source
+            await scrape_content(db, limit)
+            print("Scraping task done")
+        if doc_type == 'file':
+            # create md files
+            await create_markdown_file(db, limit)
+            print("Markdown files create task done")
+            
         # from markdown files to entities extraction and push to neo4j
         await process_data(db, limit)
         print("Data ingestion task done")
@@ -184,13 +199,3 @@ async def data_ingestion_pipeline(limit: int=10):
         print("Data ingestion failed:", e)
         return False
         
-    
-# async def create_xlsx_file(data, source_link):
-#     # Step 2: Add the link to each data dictionary
-#     records = data[1:]
-#     for record in records:
-#         record["Source"] = source_link
-#     name = source_link[7:50]
-#     # Step 3: Create DataFrame and export to Excel
-#     df = pd.DataFrame(records)
-#     df.to_excel(f"{name}.xlsx", index=False)

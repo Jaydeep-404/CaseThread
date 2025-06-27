@@ -48,7 +48,7 @@ MAX_FILES_ALLOWED = 4  # Maximum files allowed
 
 
         
-@router.post("/", response_model=CaseResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=CaseResponse, status_code=status.HTTP_201_CREATED)
 async def create_case(case_data: CaseCreate,
     current_user: Dict[str, Any] = Depends(get_current_user),
     db = Depends(get_database)
@@ -213,7 +213,7 @@ async def upload_documents(
         # Schedule background task to parse the document
         # background_tasks.add_task(data_ingestion_pipeline)
    
-        asyncio.create_task(data_ingestion_pipeline())
+        asyncio.create_task(data_ingestion_pipeline('file'))
     return uploaded_documents
 
 
@@ -273,11 +273,11 @@ async def link_document(
     # background_tasks.add_task(data_ingestion_pipeline)
     
     # Trigger background task if not already running
-    asyncio.create_task(data_ingestion_pipeline())
+    asyncio.create_task(data_ingestion_pipeline('link'))
     return DocumentResponse(**created_document)
 
 
-@router.get("/", response_model=PaginatedResponse)
+@router.get("", response_model=PaginatedResponse)
 async def get_cases(
     status: Optional[str] = None,
     page: int = Query(1, ge=1, description="Page number"),

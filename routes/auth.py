@@ -25,6 +25,11 @@ router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_PREFIX}/auth/login")
 
 
+reset_attempts = {}  # { email: [datetime1, datetime2, ...] }
+otp_req_attempts = {}
+RATE_LIMIT = 3
+WINDOW_MINUTES = 15
+
 # Helper functions
 async def get_user_by_email(db, email: str) -> Optional[Dict[str, Any]]:
     """Get user by email from database."""
@@ -294,9 +299,22 @@ async def request_otp(email_request: EmailRequest, background_tasks: BackgroundT
             detail="User not found"
         )
     
+    now = datetime.now(timezone.utc)
+    attempts = otp_req_attempts.get(req_email, [])
+
+    # Remove old attempts
+    attempts = [t for t in attempts if now - t < timedelta(minutes=WINDOW_MINUTES)]
+
+    if len(attempts) >= RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="Too many reset requests. Try again later.")
+
+    # Store current attempt
+    attempts.append(now)
+    otp_req_attempts[req_email] = attempts
+    
     # Generate new OTP
     otp = generate_otp()
-    otp_expires = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)
+    otp_expires = now + timedelta(minutes=OTP_EXPIRY_MINUTES)
     
     # Update user with new OTP
     await db.users.update_one(
@@ -361,7 +379,7 @@ async def set_password_after_verification(
         )
     
     # Hash the password
-    hashed_password = get_password_hash(data.password)
+    hashed_password = get_password_hash((data.password).replace(" ", ""))
     
     # Update user - set password
     update_result = await db.users.update_one(
@@ -383,9 +401,6 @@ async def set_password_after_verification(
     
     return {"message": "Password set successfully. You can now log in."}
 
-reset_attempts = {}  # { email: [datetime1, datetime2, ...] }
-RATE_LIMIT = 3
-WINDOW_MINUTES = 15
 
 # forgot password
 @router.post("/forgot-password")
@@ -424,7 +439,7 @@ async def forgot_password(data: EmailRequest, background_tasks: BackgroundTasks,
     
     background_tasks.add_task(send_email_async, subject, recipient, body)
 
-    return {"message": "Reset link sent to your email."}
+    return {"message": "Password reset link sent to your email."}
 
 
 @router.post("/reset-password")
